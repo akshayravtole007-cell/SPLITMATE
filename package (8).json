@@ -1,0 +1,43 @@
+import type { Metadata } from 'next';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from '@/hooks/useAuth';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'SplitMate — Split expenses effortlessly',
+  description: 'Track shared expenses, split bills, and settle up with friends and groups.',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-sans antialiased bg-slate-950 text-slate-100 min-h-screen">
+        <AuthProvider>
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#1e293b',
+                color: '#f1f5f9',
+                border: '1px solid #334155',
+                borderRadius: '12px',
+                fontSize: '14px',
+              },
+              success: { iconTheme: { primary: '#14b8a6', secondary: '#042f2e' } },
+              error: { iconTheme: { primary: '#f43f5e', secondary: '#2d0014' } },
+            }}
+          />
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}

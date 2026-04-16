@@ -1,0 +1,169 @@
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import toast from 'react-hot-toast';
+import { TrendingUp, TrendingDown, Minus, ArrowRight, Receipt, Plus } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import api from '@/lib/api';
+import { formatCurrency, formatDate, CATEGORY_ICONS } from '@/lib/utils';
+import Sidebar from '@/components/Sidebar';
+import Avatar from '@/components/Avatar';
+
+interface DashboardData {
+  youOwe: number;
+  owedToYou: number;
+  netBalance: number;
+  recentExpenses: any[];
+  friendBalances: { user: any; net: number }[];
+}
+
+export default function DashboardPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [fetching, setFetching] = useState(true);
+
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const res = await api.get('/expenses/dashboard');
+      setData(res.data);
+    } catch {
+      toast.error('Failed to load dashboard');
+    } finally {
+      setFetching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) router.push('/auth/login');
+    if (!loading && user) fetchDashboard();
+  }, [user, loading, router, fetchDashboard]);
+
+  if (loading || fetching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const netColor = !data ? '' : data.netBalance > 0 ? 'text-emerald-400' : data.netBalance < 0 ? 'text-rose-400' : 'text-slate-400';
+
+  return (
+    <div className="min-h-screen lg:pl-60">
+      <Sidebar />
+      <main className="pt-16 lg:pt-0 p-4 lg:p-8 max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 animate-fade-in">
+          <h1 className="text-2xl font-bold text-slate-100">
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{' '}
+            <span className="text-brand-400">{user?.name.split(' ')[0]}</span> 👋
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">Here&apos;s your expense overview</p>
+        </div>
+
+        {/* Balance cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 animate-slide-up">
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-rose-500/10 rounded-lg flex items-center justify-center">
+                <TrendingDown size={16} className="text-rose-400" />
+              </div>
+              <span className="text-sm text-slate-400">You owe</span>
+            </div>
+            <p className="text-2xl font-bold text-rose-400">{formatCurrency(data?.youOwe || 0)}</p>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                <TrendingUp size={16} className="text-emerald-400" />
+              </div>
+              <span className="text-sm text-slate-400">Owed to you</span>
+            </div>
+            <p className="text-2xl font-bold text-emerald-400">{formatCurrency(data?.owedToYou || 0)}</p>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-brand-500/10 rounded-lg flex items-center justify-center">
+                <Minus size={16} className="text-brand-400" />
+              </div>
+              <span className="text-sm text-slate-400">Net balance</span>
+            </div>
+            <p className={`text-2xl font-bold ${netColor}`}>{formatCurrency(Math.abs(data?.netBalance || 0))}</p>
+            {data && data.netBalance !== 0 && (
+              <p className="text-xs text-slate-500 mt-1">{data.netBalance > 0 ? 'You are owed overall' : 'You owe overall'}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Recent expenses */}
+          <div className="lg:col-span-3">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title">Recent Expenses</h2>
+              <Link href="/groups" className="text-sm text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors">
+                All groups <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            {!data?.recentExpenses.length ? (
+              <div className="card p-10 text-center">
+                <Receipt size={32} className="text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 font-medium">No expenses yet</p>
+                <p className="text-slate-600 text-sm mt-1">Join or create a group to start tracking</p>
+                <Link href="/groups" className="btn-primary inline-flex items-center gap-2 mt-4 text-sm">
+                  <Plus size={16} /> Create a Group
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.recentExpenses.map((exp, i) => (
+                  <div key={exp.id} className="card-hover p-4 flex items-center gap-4 animate-slide-up" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                      {CATEGORY_ICONS[exp.category] || '📦'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-200 truncate">{exp.description}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {exp.group_name} · {exp.paid_by_name} paid · {formatDate(exp.date)}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-slate-200 flex-shrink-0">{formatCurrency(parseFloat(exp.amount))}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Friend balances */}
+          <div className="lg:col-span-2">
+            <h2 className="section-title mb-4">Balances with Friends</h2>
+            {!data?.friendBalances.length ? (
+              <div className="card p-8 text-center">
+                <p className="text-slate-500 text-sm">No outstanding balances</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data.friendBalances.map(({ user: friend, net }, i) => (
+                  <div key={friend.id} className="card p-4 flex items-center gap-3 animate-slide-up" style={{ animationDelay: `${i * 60}ms` }}>
+                    <Avatar name={friend.name} color={friend.avatar_color} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-200 truncate">{friend.name}</p>
+                      <p className="text-xs text-slate-500">{net > 0 ? 'owes you' : 'you owe'}</p>
+                    </div>
+                    <span className={`text-sm font-semibold ${net > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {formatCurrency(Math.abs(net))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
